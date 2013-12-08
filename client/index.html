@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Space Battle</title>
+    <style>
+        body {
+            overflow: hidden;
+            color: #cccccc;
+            font-family: monospace;
+            background: url('tanks/stars.png') repeat;
+        }
+
+        .tank {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+        }
+
+        .explosion {
+            position: absolute;
+            width: 71px;
+            height: 100px;
+            background: url('tanks/Explosion.gif');
+        }
+
+        .tank.blue.north {
+            background: url('tanks/tanks.png');
+        }
+
+        .tank.blue.east {
+            background: url('tanks/tanks.png') -50px;
+        }
+
+        .tank.blue.south {
+            background: url('tanks/tanks.png') -100px;
+        }
+
+        .tank.blue.west {
+            background: url('tanks/tanks.png') -150px;
+        }
+
+        .tank.red.north {
+            background: url('tanks/tanks.png') -200px;
+        }
+
+        .tank.red.east {
+            background: url('tanks/tanks.png') -250px;
+        }
+
+        .tank.red.south {
+            background: url('tanks/tanks.png') -300px;
+        }
+
+        .tank.red.west {
+            background: url('tanks/tanks.png') -350px;
+        }
+
+        .projectile {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: url('tanks/projectile.png');
+        }
+
+        #gameStatus {
+            border: 1px solid #cccccc;
+            padding: 10px 10px 10px 10px;
+            background-color: #000;
+        }
+
+        #startArea {
+            border: 1px solid #cccccc;
+            padding: 10px 10px 10px 10px;
+            background-color: #000;
+        }
+
+        .joinGame {
+            margin-left: 10px;
+        }
+
+        .playerName {
+            font-weight: bold;
+        }
+
+        #player0_Name {
+            color: #006699;
+        }
+
+        #player1_Name {
+            color: #990000
+        }
+
+        .playerLives {
+            background-color: #99ff33;
+            height: 10px;
+           /* width: 200px;*/
+        }
+
+        .playerLives.hurt {
+            background-color: #ffff66;
+        }
+
+        .playerLives.weak {
+            background-color: #ff3300;
+        }
+
+        input {
+            border: solid 0;
+            padding: 5px 3px 3px 3px;
+            font-family: monospace;
+            color: #ffffff;
+            background-color: #666666;
+            width: 150px;
+        }
+
+        a {
+            text-decoration: none;
+            padding: 3px 3px 3px 3px;
+            background-color: #ffffff;
+            color: #ff00ff;
+        }
+
+        .starterName {
+            height: 30px;
+            width: 150px;
+            padding-top: 6px;
+        }
+
+        .instruction{
+            font-weight: bold;
+            color: #fff;
+        }
+
+        #startMessage{
+            display: none;
+            position: absolute;
+            z-index: 100;
+            font-size: 60pt;
+            font-weight: bolder;
+            top:130px;
+            left:210px;
+        }
+
+        footer {
+           position:fixed;
+           left:0px;
+           bottom:0px;
+           height:15px;
+           width:100%;
+            padding: 3px 0 0 0;
+           background: #333333;
+        }
+    </style>
+</head>
+
+<body style="overflow:hidden;">
+
+<h1>Space Battle</h1>
+
+<div id="gameStatus" style="display:none;">
+    <div style="float:left; width:250px; margin:0 100px 0 0;">
+        <span id="player0_Name" class="playerName"></span>
+
+        <div id="player0_lives" class="playerLives"></div>
+    </div>
+    <div style="float:left">
+        <span id="player1_Name" class="playerName">waiting on player 2...</span>
+
+        <div id="player1_lives" class="playerLives"></div>
+    </div>
+    <div style="clear: both"></div>
+</div>
+<div id="startArea">
+     <div>
+         <span class="instruction">Start a new game:</span>
+        <div>
+            <input type="text" required="required" placeholder="<enter name>"/>
+            <a href="#" class="joinGame" data-gameId="-1">Start</a>
+        </div>
+    </div>
+    <div id="availableGames" style="display:none; margin: 15px 0 0 0; border-top: dotted 1px;">
+        <span class="instruction">Available games:</span>
+    </div>
+</div>
+
+<div id="player0" class="tank blue east" style="display:none; top:260px;" data-direction="east"></div>
+<div id="player1" class="tank red west" style="display:none; top:260px; left:550px;" data-direction="west"></div>
+
+<div id="startMessage"></div>
+
+<footer>
+    Move: arrow keys &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    Fire: spacebar &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    websocket status: <span id="connectionStatus">disconnected</span>
+</footer>
+<!--<script src="//code.jquery.com/jquery.min.js"></script>-->
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+<!--<script src="//code.jquery.com/ui/1.8.16/jquery-ui.min.js"></script>-->
+<script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
+<script src="//ajax.aspnetcdn.com/ajax/jquery.templates/beta1/jquery.tmpl.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+
+<script id="gameTemplate" type="text/x-jQuery-tmpl">
+    <div>
+        <div class="starterName" style="float:left"> ${starter}</div>
+        <div style="float:left">vs.
+            <input type="text" required="required" placeholder="<enter name>"/>
+            <a href="#" class="joinGame" data-gameId="${gameId}">join</a>
+        </div>
+        <div style="clear: both"></div>
+    </div>
+</script>
+
+<script>
+
+var _hitSize = 50;
+var _projectileRange = 130;
+var _projectileSpeed = 5;
+var _tankSpeed = 5;
+
+var _name;
+var _webSocket;
+var _tank;
+
+$(function() {
+
+    _webSocket = io.connect();
+
+    _webSocket.on('connect', function() {
+        $('#connectionStatus').html('connected');
+    });
+
+    _webSocket.on('availableGames', function(data) {
+        $('#availableGames').html();
+        if(data.length > 0)
+            $('#availableGames').show();
+        for (var g = 0; g < data.length; g++) {
+            var game = data[g];
+            $('#gameTemplate').tmpl(game).appendTo('#availableGames');
+        }
+    });
+
+    _webSocket.on('gameStatus', function(data) {
+        $('#gameStatus').show();
+        $('#player0_Name').html(data.player0.name);
+        showHealth($('#player0_lives'), data.player0.lives);
+        if (data.player1 != null) {
+            $('#player1_Name').html(data.player1.name);
+            showHealth($('#player1_lives'), data.player1.lives);
+        }
+    });
+
+    _webSocket.on('winner', function(data){
+        if(data == _name){
+            $('#startMessage').html('Game&nbsp;Over<br/>You&nbsp;Win!');
+        }else{
+            $('#startMessage').html('Game&nbsp;Over<br/>You&nbsp;Lose!');
+        }
+        _webSocket.emit('quit');
+        $('#startMessage').show();
+        $('#gameStatus').fadeOut('slow', function(){
+            $('#startArea').fadeIn('slow', function(){
+                $('#startMessage').fadeOut(2000, function(){
+                    $('.tank').hide();
+                    _tank = null;
+                })
+            })
+        });
+    });
+
+    _webSocket.on('startGame', function(data) {
+        _tank = $('#player' + data.playerId);
+        $('.tank').show();
+        $('#startMessage').html('Game Starting!').fadeIn('fast', function(){$(this).fadeOut(3000)});
+    });
+
+    _webSocket.on('move', function(data) {
+        var otherTank = $('#' + data.tankId);
+        move(otherTank, data.direction);
+    });
+
+    _webSocket.on('fire', function(data) {
+        var otherTank = $('#' + data.tankId);
+        fire(otherTank);
+    });
+
+    $('.joinGame').on('click', function(e) {
+ 
+	  e.preventDefault();
+        var gameId = $(this).attr('data-gameId');
+        _name = $(this).prev('input').val();
+        _webSocket.emit('join', {gameId: gameId, playerName: _name});
+        $('#startArea').hide();
+        $('#availableGames').html('');
+        $('input').val('');
+    });
+
+$('#availableGames').delegate('.joinGame', 'click', function(e){      
+	  e.preventDefault();
+        var gameId = $(this).attr('data-gameId');
+        _name = $(this).prev('input').val();
+        _webSocket.emit('join', {gameId: gameId, playerName: _name});
+        $('#startArea').hide();
+        $('#availableGames').html('');
+        $('input').val('');
+    });
+
+    $(document).keydown(function(e) {
+        if (_tank == null) {
+            return;
+        }
+        switch (e.keyCode) {
+            case 32:
+                notifyFire(_tank);
+                fire(_tank);
+                break;
+            case 38:
+                notifyMove(_tank, 'north');
+                move(_tank, 'north');
+                break;
+            case 39:
+                notifyMove(_tank, 'east');
+                move(_tank, 'east');
+                break;
+            case 40:
+                notifyMove(_tank, 'south');
+                move(_tank, 'south');
+                break;
+            case 37:
+                notifyMove(_tank, 'west');
+                move(_tank, 'west');
+                break;
+        }
+    });
+});
+
+function notifyMove(tank, direction) {
+    _webSocket.emit('move', {tankId: tank.attr('id'), direction: direction});
+}
+
+function notifyFire(tank) {
+    _webSocket.emit('fire', {tankId: tank.attr('id')});
+}
+
+function move(tank, direction) {
+    //set the direction the tank should be facing
+    if (!tank.hasClass(direction)) {
+        tank.removeClass('north').removeClass('east').removeClass('south').removeClass('west')
+                .addClass(direction);
+        tank.data('direction', direction);
+    }
+
+    //move it
+    var position = tank.position();
+    switch (direction) {
+        case 'north':
+            tank.animate({top: position.top - _tankSpeed}, {duration:0});
+            break;
+        case 'east':
+            tank.animate({left: position.left + _tankSpeed}, {duration:0});
+            break;
+        case 'south':
+            tank.animate({top: position.top + _tankSpeed}, {duration:0});
+            break;
+        case 'west':
+            tank.animate({left: position.left - _tankSpeed}, {duration:0});
+            break;
+    }
+}
+
+function fire(tank) {
+
+    //get the otherTank
+    var otherTank = $('.tank').not(tank);
+
+    //start the path from the "middle" of the firing tank
+    var startPosition = tank.position();
+    var startTop = startPosition.top + 20;
+    var startLeft = startPosition.left + 20;
+
+    //create a projectile instance
+    var projectile = $('<div class="projectile"></div>');
+    projectile.css('top', startTop);
+    projectile.css('left', startLeft);
+    projectile.insertBefore(tank);
+
+    //begin the repositioning loop
+    var direction = tank.data('direction');
+    for (var t = 1; t <= _projectileRange; t++) {
+
+        switch (direction) {
+            case 'north':
+                startTop -= _projectileSpeed;
+                break;
+            case 'east':
+                startLeft += _projectileSpeed;
+                break;
+            case 'south':
+                startTop += _projectileSpeed;
+                break;
+            case 'west':
+                startLeft -= _projectileSpeed;
+                break;
+        }
+
+        //move projectile to new position
+        projectile.animate({left: startLeft, top: startTop}, {duration:1, complete: function() {
+
+            //determine position of projectile
+            var projectilePosition = $(this).position();
+            var thisLeft = projectilePosition.left;
+            var thisTop = projectilePosition.top;
+
+            //determine position of other tank
+            var otherPosition = otherTank.position();
+            var otherLeft = otherPosition.left;
+            var otherTop = otherPosition.top;
+
+            //detect collision
+            if (
+                    thisLeft > (otherLeft)
+                            && thisLeft < (otherLeft + _hitSize)
+                            && thisTop > (otherTop)
+                            && thisTop < (otherTop + _hitSize)
+                    ) {
+
+                if (otherTank.attr('id') != _tank.attr('id')) {
+                    //notify socket
+                    _webSocket.emit('hit', {playerId: otherTank.attr('id').substring(6)});
+                }
+
+                //remove the projectile
+                $(this).clearQueue().remove();
+
+                hit(otherTank);
+            }
+
+        }});
+    }
+    projectile.animate({height: 0}, {duration:0, complete: function() {
+        $(this).remove();
+    }});
+}
+
+function hit(tank) {
+    var position = tank.position();
+    var explosion = $('<div class="explosion"></div>');
+    explosion.css('top', position.top - 20);
+    explosion.css('left', position.left);
+    explosion.insertAfter(tank);
+    tank.fadeOut('fast');
+    explosion.animate({opacity: 0}, {duration:1000, complete : function() {
+        $(this).remove();
+        tank.show();
+    }});
+}
+
+function showHealth(livesDiv, livesCount) {
+    var health = livesCount * 10;
+    livesDiv.css('width', health);
+    if (health < 120 & health > 50) {
+        livesDiv.addClass('hurt');
+    } else if (health <= 50) {
+        livesDiv.removeClass('hurt');
+        livesDiv.addClass('weak');
+    }
+}
+
+</script>
+
+</body>
+</html>
+
