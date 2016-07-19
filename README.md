@@ -8,8 +8,6 @@ Play live at [https://space-battle.herokuapp.com/](https://space-battle.herokuap
 ![screenshot](https://github.com/d5172/SpaceBattle/raw/master/screen-shot.png "screenshot")
 
 
-
-
 ----
 local start: 
 PORT=2000 node index
