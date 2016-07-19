@@ -12,7 +12,7 @@ var httpServer = http.createServer(function(request, response) {
     clientFiles.serve(request, response);
   }).resume();
 });
-httpServer.listen(2000);
+httpServer.listen(process.env.PORT);
 
 var io = socket_io.listen(httpServer);
 
