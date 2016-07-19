@@ -1,4 +1,4 @@
 SpaceBattle
 ===========
 
-Two-player, online game written from scratch to learn web sockets and Node.js
+Two-player, online game written to learn web sockets and Node.js.
